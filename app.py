@@ -66,7 +66,7 @@ def close_connection(exception):
 
 SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 
-cred_json = os.environ["GOOGLE_APPLICATION_CREDENTIALS_JSON"]
+cred_json = os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"]
 
 credentials = service_account.Credentials.from_service_account_info(
     json.loads(cred_json),
