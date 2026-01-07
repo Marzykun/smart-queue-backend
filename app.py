@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 import sqlite3
 from datetime import datetime
@@ -12,16 +12,10 @@ from google.auth.transport.requests import Request
 app = Flask(__name__)
 CORS(app)
 
-DB_NAME = "queue.db"
+DB_NAME = os.path.join(os.path.dirname(__file__), "queue.db")
 
 # ------------------ DATABASE ------------------
 
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.before_first_request
 def init_db():
     conn = get_db()
     c = conn.cursor()
@@ -46,6 +40,27 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# Flask 3 compatible "run once" hook
+@app.before_request
+def init_db_once():
+    if not getattr(app, "db_init", False):
+        init_db()
+        app.db_init = True
+
+def get_db():
+	# return a sqlite3 connection with Row factory, stored on flask.g
+	if not hasattr(g, "db"):
+		conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+		conn.row_factory = sqlite3.Row
+		g.db = conn
+	return g.db
+
+@app.teardown_appcontext
+def close_connection(exception):
+	db = g.pop("db", None)
+	if db is not None:
+		db.close()
 
 # ------------------ FIREBASE AUTH ------------------
 
@@ -128,10 +143,17 @@ def finish_customer(entry_id):
 
     if next_waiting:
         next_id = next_waiting["id"]
+        next_pos = next_waiting["position"]
 
         c.execute(
             "UPDATE queue SET status='seated', position=NULL WHERE id=?",
             (next_id,)
+        )
+
+        # shift positions of remaining waiting customers down by 1
+        c.execute(
+            "UPDATE queue SET position = position - 1 WHERE status='waiting' AND position > ?",
+            (next_pos,)
         )
 
         # get phone for notification
