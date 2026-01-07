@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Queue Notification</title>
+  </head>
+
+  <body>
+    <h2>Queue Notification</h2>
+
+    <p>Enter your phone number (same as in queue app)</p>
+
+    <input id="phone" placeholder="Phone number" />
+    <br><br>
+
+    <button type="button" onclick="enableNotifications()">
+      Enable Notifications
+    </button>
+
+    <p id="status">Click above to enable notifications.</p>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging-compat.js"></script>
+
+    <script>
+      // 🔥 YOUR FIREBASE CONFIG (copy from Firebase console)
+      firebase.initializeApp({
+        apiKey: "AIzaSyD6yCxxnELKEnI6uiv010kchd9D0gA8S9E",
+        authDomain: "smart-queue-501ad.firebaseapp.com",
+        projectId: "smart-queue-501ad",
+        messagingSenderId: "636720315516",
+        appId: "1:636720315516:web:b4adb6a038649dcd16ddf9"
+      });
+
+      const messaging = firebase.messaging();
+
+      messaging.onMessage((payload) => {
+  console.log("Message in foreground:", payload);
+
+  new Notification(
+    payload.notification?.title || "Queue Update",
+    {
+      body: payload.notification?.body || "Your turn is coming!",
+    }
+  );
+});
+
+
+      async function enableNotifications() {
+        try {
+          const permission = await Notification.requestPermission();
+          console.log("permission:", permission);
+
+          if (permission !== "granted") {
+            alert("Notifications not allowed");
+            return;
+          }
+
+          // Get token
+          const token = await messaging.getToken({
+            vapidKey: "BEaJlrQTj6l7k99PQtyWwolyONb6ZXMf4WcOXpS027xnwpgS4y2uX0OSXhCbuUZJJ1q8iw9ViSlnuv5RIl8q1oE"
+          });
+
+          console.log("TOKEN:", token);
+
+          const phone = document.getElementById("phone").value.trim();
+
+          if (!phone) {
+            alert("Enter phone number first");
+            return;
+          }
+
+          // Save token to backend
+          await fetch("http://127.0.0.1:5000/save_token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone: phone,
+              token: token
+            })
+          });
+
+          document.getElementById("status").innerText =
+            "Notifications enabled ✔ Token saved.";
+
+        } catch (err) {
+          console.error("ERROR enabling notifications", err);
+        }
+      }
+    </script>
+  </body>
+</html>
